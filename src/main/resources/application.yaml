@@ -1,0 +1,70 @@
+debug: false
+base-directory: '/tmp/qc-data' #c:\\tmp\\qc-data #
+s3-directory: ${base-directory}/s3Files/ #${base-directory}\\s3Files\\
+archive-directory: ${base-directory}/archive/ #${base-directory}\\archive\\
+
+server:
+    servlet:
+        context-path: /invdb-ms
+   
+jwt:
+    #expiration: 1440 # not using this value currently. setting expiration to end of day
+    private-key: classpath:jwt/GHG_public_private.key
+    public-key: classpath:jwt/GHG_public.key
+
+# rsa:
+#     private-key: classpath:jwt/privateKey.pem
+#     public-key: classpath:jwt/publicKey.pem
+
+spring:
+    main:
+        allow-circular-references: false
+    
+    profiles:
+        active: test
+    
+    #    main:
+    #        lazy-initialization: true
+    datasource:
+        hikari:
+            minimum-idle: 2
+    
+    jpa:
+        open-in-view: false
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+                show_sql: false
+                session:
+                    '[events.log.LOG_QUERIES_SLOWER_THAN_MS]': 20
+                default_schema: ggds_invdb
+                jdbc:
+                    time_zone: America/New_York
+                    batch_size: 20
+
+    servlet:
+        multipart:
+            max-file-size: 35MB
+            max-request-size: 40MB
+    mvc:
+        async:
+            request-timeout: 1440000
+
+logging:
+    level:
+        '[com.zaxxer.hikari]': debug
+        '[gov.epa.invdb.controller]': info
+        '[org.hibernate.sql]': error
+        '[org.hibernate.SQL_SLOW]': error
+        '[com.zaxxer.hikari.pool.HikariPool]': info
+        '[org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping]': info
+        '[org.springframework.beans.factory]': info
+
+python:
+    endpoint:
+        onlineReports: /load-online-report?report_id=%s&report_type_id=%s&user_id=%s
+
+s3:
+    PERMISSIONS_API_KEY: jLAI03MkkKapv9H5b9ZUb7uPjXopK63180Pj702R
+    
+

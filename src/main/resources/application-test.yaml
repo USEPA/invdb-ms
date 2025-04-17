@@ -1,0 +1,11 @@
+spring:  
+    datasource:
+        url: jdbc:postgresql://ghg-dbora50-r7.corp.saic.com/psql
+        username: invdb_usr
+        password: invdb_usr
+
+python:
+    service:
+        url: 'https://ghg-test-r8.corp.saic.com/invdb-py' #'http://127.0.0.1:5000/invdb-py' 
+s3:
+    bucket: invdb-test-data-files

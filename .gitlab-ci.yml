@@ -1,0 +1,38 @@
+default:
+  tags:
+    - eggrt-stg-runner
+stages:
+  - compile-test
+  - build-image-saic
+cache:
+  paths:
+    - .gradle/wrapper
+    - .gradle/caches
+compile-test:
+  image: 015137877991.dkr.ecr.us-east-1.amazonaws.com/gradle:8.6-jdk21-jammy-saic-root
+  stage: compile-test
+  script:
+    - ./gradlew test
+  only:
+    variables:
+      - $GITLAB_SITE == 'SAIC'
+build-image-saic:
+  image: 015137877991.dkr.ecr.us-east-1.amazonaws.com/paketobuildpacks/builder-jammy-base-saic-root
+  variables:
+    CNB_PLATFORM_API: "0.12"
+  stage: build-image-saic
+  script:
+    - mkdir -p platform/env
+    - mkdir -p platform/bindings/ca-certificates
+    - cp /usr/local/share/ca-certificates/saic-root.crt platform/bindings/ca-certificates/saic-root.crt
+    - echo 'ca-certificates' > platform/bindings/ca-certificates/type
+    - echo "true" >> platform/env/BP_EMBED_CERTS
+    - echo "true" >> platform/env/BP_RUNTIME_CERT_BINDING_DISABLED
+    - echo "21.*" >> platform/env/BP_JVM_VERSION
+    - echo "tomcat" >> platform/env/BP_JAVA_APP_SERVER
+    - mkdir ~/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > ~/.docker/config.json
+    - /cnb/lifecycle/creator -app=. -platform platform $CI_REGISTRY_IMAGE/invdb-ms:$CI_COMMIT_SHORT_SHA
+  only:
+    variables:
+      - $GITLAB_SITE == 'SAIC'

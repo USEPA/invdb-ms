@@ -1,0 +1,13 @@
+package gov.epa.ghg.invdb.rest.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class Tab {
+    String tabName;
+    String tabLabel;
+}

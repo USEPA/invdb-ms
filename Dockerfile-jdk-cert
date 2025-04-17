@@ -1,0 +1,8 @@
+FROM gradle:8.6-jdk21-jammy
+
+RUN apt update && \
+    apt install ca-certificates && \
+    curl -k https://uat.ccdsupport.com/etc/saic-root.pem -o /tmp/saic-root.pem && \
+    cp /tmp/saic-root.pem /usr/local/share/ca-certificates && \
+    update-ca-certificates && \
+    keytool -import -alias SAIC_Trusted_Root -keystore /opt/java/openjdk/lib/security/cacerts -file /tmp/saic-root.pem --storepass changeit -v -noprompt

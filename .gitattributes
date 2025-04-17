@@ -1,0 +1,45 @@
+# https://www.git-scm.com/docs/gitattributes
+
+# Set the default behavior, in case people don't have core.autocrlf set.
+# normalize line endings to LF.
+* text=auto
+
+# Explicitly declare text files you want to always be normalized and converted
+# to native line endings on checkout.
+*.c text
+*.h text
+*.css text
+*.groovy text
+*.htm text
+*.html text
+*.java text
+*.js text
+*.json text
+*.jsp text
+*.jsx text
+*.properties text
+*.sql text
+*.txt text
+*.xml text
+*.xsd text
+*.xsl text
+*.yaml text
+*.yml text
+
+# Declare files that will always have CRLF line endings on checkout.
+*.{bat,[bB][aA][tT]} text eol=crlf
+*.{cmd,[cC][mM][dD]} text eol=crlf
+
+# Declare files that will always have LF line endings on checkout.
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Denote all files that are truly binary and should not be modified.
+*.gif binary
+*.ico binary
+*.jar binary
+*.key binary
+*.png binary
+*.xls binary
+*.xlsx binary

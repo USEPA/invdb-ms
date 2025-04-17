@@ -1,0 +1,12 @@
+spring:
+    datasource:
+        url: jdbc:postgresql://ghg-postgresql.c4f4o4t3zjmk.us-east-1.rds.amazonaws.com:5432/psql
+        username: invdb_usr
+        password: ggds2017qtr2
+
+python:
+    service:
+        url: 'https://uat.ccdsupport.com/invdb-py'  
+
+s3:
+    bucket: invdb-prod-data-files        
