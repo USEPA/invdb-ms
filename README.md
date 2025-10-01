@@ -1,4 +1,5 @@
 # invdb-ms
+# Status: Archived / No Longer Maintained
 
 ## Local setup
 - Open 'Git Bash' terminal
