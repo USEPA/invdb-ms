@@ -37,7 +37,7 @@ public class ReportService {
             Date today = new Date();
             byte[] fileContent = fileUtil.getFilebytes(file);
 
-            String reportName = excelUtil.readCell(file, "Table", 2, 2).orElse("");
+            String reportName = excelUtil.readCellWithFormula(file, "Table", 2, 2).orElse("");
             // Check if there is already an existing record for this report
             ReportDto existingRpt = existingReports.stream()
                     .filter(f -> f.getReportName().equals(reportName)).findFirst().orElse(null);

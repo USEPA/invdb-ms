@@ -6,6 +6,9 @@ archive-directory: ${base-directory}/archive/ #${base-directory}\\archive\\
 server:
     servlet:
         context-path: /invdb-ms
+
+    tomcat:
+        max-swallow-size: 100MB # set just above the max-file-size so tomcat doesn't reset connection and error response is sent to user
    
 jwt:
     #expiration: 1440 # not using this value currently. setting expiration to end of day
@@ -44,8 +47,8 @@ spring:
 
     servlet:
         multipart:
-            max-file-size: 35MB
-            max-request-size: 40MB
+            max-file-size: 60MB
+            max-request-size: 60MB
     mvc:
         async:
             request-timeout: 1440000
@@ -63,7 +66,7 @@ logging:
 python:
     endpoint:
         onlineReports: /load-online-report?report_id=%s&report_type_id=%s&user_id=%s
-
+        restartPython: /restart-python-container
 s3:
     PERMISSIONS_API_KEY: jLAI03MkkKapv9H5b9ZUb7uPjXopK63180Pj702R
     

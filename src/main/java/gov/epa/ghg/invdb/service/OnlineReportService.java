@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import gov.epa.ghg.invdb.enumeration.AttachmentType;
 import gov.epa.ghg.invdb.enumeration.ReportStatus;
+import gov.epa.ghg.invdb.exception.BadRequestException;
 import gov.epa.ghg.invdb.model.DimReport;
 import gov.epa.ghg.invdb.model.DimTimeSeries;
 import gov.epa.ghg.invdb.model.ReportOutputArComp;
@@ -303,7 +304,7 @@ public class OnlineReportService {
 
     public byte[] generateEmissionsReportForDownload(List<Map<String, Object>> headers, List<Map<String, Object>> data,
             String format)
-            throws IOException, Exception {
+            throws Exception {
         byte[] result;
         if (format.equalsIgnoreCase(AttachmentType.JSON.name())) {
             result = jsonUtil.generateJson(headers, data);
@@ -312,7 +313,7 @@ public class OnlineReportService {
         } else if (format.equalsIgnoreCase(AttachmentType.CSV.name())) {
             result = csvUtil.generateCsv(headers, data);
         } else {
-            throw new Exception("Unrecognizable download format");
+            throw new BadRequestException("Unrecognizable download format");
         }
         return result;
     }

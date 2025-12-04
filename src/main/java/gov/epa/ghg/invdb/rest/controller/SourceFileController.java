@@ -74,8 +74,7 @@ public class SourceFileController {
                         @RequestParam(name = "user") int userId)
                         throws Exception {
                 // get source name details
-                List<DimSourceNameDto> sourceNames = dimSourceNameRepository.findByLayerIdAndPubYearYear(layerId,
-                                rptYear);
+                List<DimSourceNameDto> sourceNames = dimSourceNameRepository.findByLayerIdAndPubYearYear(layerId,rptYear);
                 // also get existing source files
                 List<SourceFileDto> existingSrcFiles = sourceFileRepository.getFilesWithSrcNameByLayerAndYear(layerId,
                                 rptYear);

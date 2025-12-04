@@ -13,20 +13,21 @@ import gov.epa.ghg.invdb.rest.dto.QcCompReportOutputDto;
 @Repository
 public interface QcCompReportOutputRepository extends JpaRepository<QcCompReportOutput, Long> {
 
-    @Query("select new gov.epa.ghg.invdb.rest.dto.QcCompReportOutputDto(dro.reportOutputId, dro.reportRowId, dro.reportOutputYearId, dro.reportOutputValue) "
+    @Query("select new gov.epa.ghg.invdb.rest.dto.QcCompReportOutputDto(dro.reportOutputId, dro.reportRowId, dro.reportOutputYearId, dro.reportOutputValue, ros.stateCode) "
             + "from QcCompReportOutput dro "
             + "left join dro.reportRow reportRow "
-            + "where reportRow.reportId = :reportId "
-            )
+            + "left join dro.reportOutputState ros "
+            + "where reportRow.reportId = :reportId ")
     List<QcCompReportOutputDto> findByReportId(Long reportId);
 
-    @Query("select new gov.epa.ghg.invdb.rest.dto.QcCompReportOutputDto(dro.reportOutputId, dro.reportRowId, dro.reportOutputYearId, dro.reportOutputValue) "
-    + "from QcCompReportOutput dro "
-    + "left join dro.reportRow reportRow "
-    + "where reportRow.reportRowId = :reportRowId "
-    + "order by reportRow.reportRowId"
-    )
-    List<QcCompReportOutputDto> findByReportRowId(Long reportRowId);
+    // @Query("select new
+    // gov.epa.ghg.invdb.rest.dto.QcCompReportOutputDto(dro.reportOutputId,
+    // dro.reportRowId, dro.reportOutputYearId, dro.reportOutputValue) "
+    // + "from QcCompReportOutput dro "
+    // + "left join dro.reportRow reportRow "
+    // + "where reportRow.reportRowId = :reportRowId "
+    // + "order by reportRow.reportRowId")
+    // List<QcCompReportOutputDto> findByReportRowId(Long reportRowId);
 
     @Query(value = "select ggds_invdb.em_qc_output_populate(:response, :userId)", nativeQuery = true)
     String populateQcQueryResponse(@Param("response") String response, @Param("userId") int userId);

@@ -4,18 +4,21 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import gov.epa.ghg.invdb.exception.BadRequestException;
 import gov.epa.ghg.invdb.rest.dto.AttachmentDto;
 import gov.epa.ghg.invdb.util.JsonUtil;
+import gov.epa.ghg.invdb.util.ResponseEntityUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.log4j.Log4j2;
 
@@ -39,6 +42,18 @@ public class AttachmentHelper {
         }
     }
 
+    public ResponseEntity<StreamingResponseBody> downloadZip(String filename, List<AttachmentDto> attachmentDtos) {
+        StreamingResponseBody stream = outputStream -> {
+            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream);
+                    ZipOutputStream zipOutputStream = new ZipOutputStream(bufferedOutputStream)) {
+                for (AttachmentDto attachmentDto : attachmentDtos) {
+                    addFileToZip(zipOutputStream, attachmentDto);
+                }
+            }
+        };
+        return ResponseEntityUtil.downloadZipResponse(stream, filename);
+    }
+
     /**
      * Helper function to create a ResponseEntity with appropriate headers for file
      * download.
@@ -48,10 +63,8 @@ public class AttachmentHelper {
      * @param fileType File type (e.g., "excel", "json", "csv").
      * @return ResponseEntity for file download.
      */
-    public void createFileDownloadResponse(HttpServletResponse response, byte[] fileData, String fileName,
-            String fileType) throws IOException {
-        HttpHeaders headers = new HttpHeaders();
-
+    public ResponseEntity<StreamingResponseBody> createFileDownloadResponse(byte[] fileData, String fileName,
+            String fileType) {
         // Determine the content type and file extension based on the file type
         String contentType;
         String fileExtension;
@@ -70,18 +83,19 @@ public class AttachmentHelper {
                 fileExtension = ".csv";
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported file type: " + fileType);
+                throw new BadRequestException("Unsupported file type: " + fileType);
         }
-
-        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"" + fileName + fileExtension + "\"");
-        response.setHeader(HttpHeaders.CONTENT_TYPE, contentType + "; charset=" + StandardCharsets.UTF_8.name());
-        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-        response.setHeader("Pragma", "");
-
-        try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(response.getOutputStream())) {
-            bufferedOutputStream.write(fileData);
-        }
+        StreamingResponseBody stream = outputStream -> {
+            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream)) {
+                bufferedOutputStream.write(fileData);
+                bufferedOutputStream.flush();
+            } catch (Exception e) {
+                log.error("Error streaming file.", e);
+                throw e;
+            }
+        };
+        return ResponseEntityUtil.downloadResponse(stream, fileName + fileExtension,
+                contentType);
     }
 
     public byte[] downloadZip(List<AttachmentDto> attachmentDtos) throws IOException {
@@ -152,15 +166,19 @@ public class AttachmentHelper {
      */
     private void addFileToZip(ZipOutputStream zipOutputStream, AttachmentDto attachmentDto) throws IOException {
         byte[] bytes = null;
+        String extension = null;
         switch (attachmentDto.getAttachmentType()) {
             case EXCEL:
                 bytes = attachmentDto.getContentBinary();
+                extension = ".xlsx";
                 break;
             case JSON:
                 bytes = attachmentDto.getContentText().getBytes();
+                extension = ".json";
                 break;
             case CSV:
                 bytes = attachmentDto.getContentText().getBytes();
+                extension = ".csv";
                 break;
             case PDF:
                 // TODO: to be implemented
@@ -174,7 +192,8 @@ public class AttachmentHelper {
             try (ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
                 byte[] buffer = new byte[1024];
                 int len = 0;
-                zipOutputStream.putNextEntry(new ZipEntry(attachmentDto.getAttachmentName()));
+                zipOutputStream.putNextEntry(new ZipEntry(attachmentDto.getAttachmentName()
+                        + (attachmentDto.getAttachmentName().indexOf(".") > 0 ? "" : extension)));
                 while ((len = input.read(buffer)) > 0) {
                     zipOutputStream.write(buffer, 0, len);
                 }

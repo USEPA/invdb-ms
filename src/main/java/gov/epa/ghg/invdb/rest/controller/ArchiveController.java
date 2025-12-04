@@ -10,14 +10,17 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import gov.epa.ghg.invdb.enumeration.AttachmentType;
+import gov.epa.ghg.invdb.exception.BadRequestException;
 import gov.epa.ghg.invdb.model.ArchiveAttachment;
 import gov.epa.ghg.invdb.model.Report;
 import gov.epa.ghg.invdb.repository.ArchiveAttachmentRepository;
@@ -32,6 +35,7 @@ import gov.epa.ghg.invdb.rest.dto.AttachmentDto;
 import gov.epa.ghg.invdb.rest.dto.PublicationObjectDto;
 import gov.epa.ghg.invdb.rest.helper.AttachmentHelper;
 import gov.epa.ghg.invdb.service.ArchiveService;
+import gov.epa.ghg.invdb.util.ResponseEntityUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.log4j.Log4j2;
 
@@ -103,33 +107,25 @@ public class ArchiveController {
         }
 
         @GetMapping("/download")
-        public void download(@RequestParam(name = "archiveAttachmentId") Long archiveAttachmentId,
-                        HttpServletResponse response)
-                        throws Exception {
+        public ResponseEntity<StreamingResponseBody> download(
+                        @RequestParam(name = "archiveAttachmentId") Long archiveAttachmentId) {
                 ArchiveAttachment attachment = archiveAttachmentRepository.findById(archiveAttachmentId).orElse(null);
-                if (attachment != null && attachment.getAttachmentContent() != null) {
-                        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
-                                        "attachment; filename=" + attachment.getAttachmentName() + ".zip");
-                        response.setHeader(HttpHeaders.CONTENT_TYPE, "application/zip;");
-                        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-                        response.setHeader("Pragma", "");
-
-                        byte[] data = attachment.getAttachmentContent();
+                if (attachment == null || attachment.getAttachmentContent() == null) {
+                        throw new BadRequestException("Attachment is empty");
+                }
+                byte[] data = attachment.getAttachmentContent();
+                StreamingResponseBody stream = outputStream -> {
                         try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(
-                                        response.getOutputStream());
+                                        outputStream);
                                         ByteArrayInputStream input = new ByteArrayInputStream(data)) {
                                 byte[] buffer = new byte[1024];
                                 int len = 0;
                                 while ((len = input.read(buffer)) > 0) {
                                         bufferedOutputStream.write(buffer, 0, len);
                                 }
-                        } catch (IOException e) {
-                                // Log the exception, consider adding more specific handling
-                                log.error("Error sending file", e);
                         }
-                } else {
-                        response.setStatus(HttpStatus.NOT_FOUND.value());
-                }
+                };
+                return ResponseEntityUtil.downloadZipResponse(stream, attachment.getAttachmentName());
         }
 
         @GetMapping("/getYearLayerCombos")
@@ -144,7 +140,8 @@ public class ArchiveController {
         public java.util.List<ArchiveObjectYearLayerDto> getQCPrefixObjects() {
                 List<Object[]> results = archiveObjectRepository.getArchiveObjectsWithQCPrefixes();
                 return results.stream()
-                                .map(row -> new ArchiveObjectYearLayerDto((Integer) row[0], (String) row[1], (Integer) row[2], (Integer) row[3], (String) row[4]))
+                                .map(row -> new ArchiveObjectYearLayerDto((Integer) row[0], (String) row[1],
+                                                (Integer) row[2], (Integer) row[3], (String) row[4]))
                                 .collect(Collectors.toList());
         }
 

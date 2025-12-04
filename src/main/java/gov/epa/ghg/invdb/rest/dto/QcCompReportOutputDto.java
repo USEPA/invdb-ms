@@ -10,4 +10,5 @@ public class QcCompReportOutputDto {
     private Long reportRowId;
     private Integer reportOutputYearId;
     private Float reportOutputValue;
+    private String stateCode;
 }

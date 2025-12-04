@@ -29,6 +29,9 @@ public class DimCategory implements BaseModel {
 
     @Column(name = "subsector_id")
     private Integer subsectorId;
+    
+    @Column(name = "category_active")
+    private String categoryActive;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "subsector_id", insertable = false, updatable = false)

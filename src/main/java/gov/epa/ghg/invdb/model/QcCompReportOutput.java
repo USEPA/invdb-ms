@@ -50,4 +50,8 @@ public class QcCompReportOutput implements Serializable {
         @JoinColumn(name = "LAST_UPDATED_BY", insertable = false, updatable = false)
         private User reportLastUpdateUser;
 
+        @ManyToOne(optional = false)
+        @JoinColumn(name = "state_id", insertable = false, updatable = false)
+        private DimState reportOutputState;
+
 }

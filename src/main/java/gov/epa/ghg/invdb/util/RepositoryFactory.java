@@ -7,7 +7,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import gov.epa.ghg.invdb.repository.BaseRepository;
+import gov.epa.ghg.invdb.repository.BaseDimTableRepository;
 import gov.epa.ghg.invdb.repository.DimCategoryRepository;
 import gov.epa.ghg.invdb.repository.DimFuelTypeRepository;
 import gov.epa.ghg.invdb.repository.DimGhgCategoryRepository;
@@ -32,7 +32,7 @@ public class RepositoryFactory {
     @Autowired
     private DimGhgRepository dimGhgRepository;
 
-    private final Map<String, BaseRepository<?, ?>> repositoryMap = new HashMap<>();
+    private final Map<String, BaseDimTableRepository<?, ?>> repositoryMap = new HashMap<>();
 
     @PostConstruct
     public void init() {
@@ -46,8 +46,8 @@ public class RepositoryFactory {
     }
 
     @SuppressWarnings("unchecked")
-    public <T, ID extends Serializable> BaseRepository<T, ID> getRepository(String tablename) {
-        BaseRepository<T, ID> repository = (BaseRepository<T, ID>) repositoryMap.get(tablename);
+    public <T, ID extends Serializable> BaseDimTableRepository<T, ID> getRepository(String tablename) {
+        BaseDimTableRepository<T, ID> repository = (BaseDimTableRepository<T, ID>) repositoryMap.get(tablename);
         if (repository == null) {
             throw new IllegalArgumentException("Unknown table name: " + tablename);
         }
