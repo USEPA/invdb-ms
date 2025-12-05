@@ -17,6 +17,7 @@ import gov.epa.ghg.invdb.model.DimQcReport;
 import gov.epa.ghg.invdb.repository.DimQcReportRepository;
 import gov.epa.ghg.invdb.repository.SourceFileAttachmentRepository;
 import gov.epa.ghg.invdb.rest.dto.AttachmentDto;
+import gov.epa.ghg.invdb.rest.dto.DimQcCompReportByStateDto;
 import gov.epa.ghg.invdb.rest.dto.DimQcCompReportRowDto;
 import gov.epa.ghg.invdb.rest.dto.DimQcReportDto;
 import gov.epa.ghg.invdb.rest.helper.AttachmentHelper;
@@ -76,9 +77,17 @@ public class QcController {
         return refreshedReport;
     }
 
+    // @GetMapping("/qcReportData")
+    // public List<DimQcCompReportRowDto> getQcReportData(@RequestParam(name =
+    // "reportId") Long reportId) {
+    // List<DimQcCompReportRowDto> reportRows =
+    // qcReportService.getQcReportData(reportId);
+    // return reportRows;
+    // }
+
     @GetMapping("/qcReportData")
-    public List<DimQcCompReportRowDto> getQcReportData(@RequestParam(name = "reportId") Long reportId) {
-        List<DimQcCompReportRowDto> reportRows = qcReportService.getQcReportData(reportId);
+    public List<DimQcCompReportByStateDto> getQcReportData(@RequestParam(name = "reportId") Long reportId) {
+        List<DimQcCompReportByStateDto> reportRows = qcReportService.getQcReportData(reportId);
         return reportRows;
     }
 

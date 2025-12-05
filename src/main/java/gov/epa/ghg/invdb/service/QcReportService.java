@@ -2,12 +2,15 @@ package gov.epa.ghg.invdb.service;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.map.LinkedMap;
 import org.apache.commons.lang3.StringUtils;
@@ -18,11 +21,14 @@ import org.springframework.stereotype.Service;
 
 import gov.epa.ghg.invdb.enumeration.ReportStatus;
 import gov.epa.ghg.invdb.model.DimQcReport;
+import gov.epa.ghg.invdb.model.DimState;
 import gov.epa.ghg.invdb.model.DimTimeSeries;
 import gov.epa.ghg.invdb.repository.DimQcCompReportRowRepository;
 import gov.epa.ghg.invdb.repository.DimQcReportRepository;
+import gov.epa.ghg.invdb.repository.DimStateRepository;
 import gov.epa.ghg.invdb.repository.DimTimeSeriesRepository;
 import gov.epa.ghg.invdb.repository.QcCompReportOutputRepository;
+import gov.epa.ghg.invdb.rest.dto.DimQcCompReportByStateDto;
 import gov.epa.ghg.invdb.rest.dto.DimQcCompReportRowDto;
 import gov.epa.ghg.invdb.rest.dto.DimQcReportDto;
 import gov.epa.ghg.invdb.rest.dto.QcCompReportOutputDto;
@@ -43,6 +49,8 @@ public class QcReportService {
     @Autowired
     private DimTimeSeriesRepository dimTimeSeriesReporsitory;
     @Autowired
+    private DimStateRepository dimStateReporsitory;
+    @Autowired
     private RestService restService;
     @Autowired
     private ExcelUtil excelUtil;
@@ -53,14 +61,102 @@ public class QcReportService {
     private String pythonEndpointUrl;
     private final int reportType = 2;
 
-    public List<DimQcCompReportRowDto> getQcReportData(Long reportId) {
+    // public List<DimQcCompReportRowDto> getQcReportData(Long reportId) {
+    // List<DimQcCompReportRowDto> reportRows =
+    // dimQcCompReportRowRepository.findByReportId(reportId);
+    // // Get All report data
+    // List<QcCompReportOutputDto> reportData =
+    // qcRepository.findByReportId(reportId);
+    // DimQcReport report = dimQcReportRepository.findById(reportId).get();
+    // Map<Integer, DimTimeSeries> yearsByIdMap =
+    // getReportingYears(report.getReportingYear());
+
+    // // Map report emissions data to each row
+    // Map<Long, Map<Integer, QcCompReportOutputDto>> reportDataByRow = new
+    // HashMap<Long, Map<Integer, QcCompReportOutputDto>>();
+    // for (QcCompReportOutputDto dataEntry : reportData) {
+    // if (reportDataByRow.get(dataEntry.getReportRowId()) == null) {
+    // reportDataByRow.put(dataEntry.getReportRowId(), new HashMap<Integer,
+    // QcCompReportOutputDto>());
+    // try {
+    // reportDataByRow.get(dataEntry.getReportRowId())
+    // .put(yearsByIdMap.get(dataEntry.getReportOutputYearId()).getYear(),
+    // dataEntry);
+    // } catch (NullPointerException npe) {
+    // log.debug("NPE caught mapping report output data by year by row");
+    // }
+    // } else {
+    // try {
+    // reportDataByRow.get(dataEntry.getReportRowId())
+    // .put(yearsByIdMap.get(dataEntry.getReportOutputYearId()).getYear(),
+    // dataEntry);
+    // } catch (NullPointerException npe) {
+    // log.debug("NPE caught mapping report output data by year by row");
+    // }
+    // }
+    // }
+
+    // for (DimQcCompReportRowDto reportRow : reportRows) {
+    // for (DimTimeSeries year : yearsByIdMap.values()) {
+    // Float emissionValue = 0F;
+    // try {
+    // emissionValue =
+    // reportDataByRow.get(reportRow.getReportRowId()).get(year.getYear())
+    // .getReportOutputValue();
+    // } catch (NullPointerException npe) {
+    // log.debug("NPE caught mapping report output data to rows");
+    // }
+    // reportRow.getEmissionsMap().put(year.getYear(), emissionValue);
+    // }
+    // }
+
+    // // make sure rows are sorted by row_order before returning
+    // Collections.sort(reportRows, (row1, row2) -> row1.getRowOrder() -
+    // row2.getRowOrder());
+    // return reportRows;
+    // }
+
+    public List<DimQcCompReportByStateDto> getQcReportData(Long reportId) {
         List<DimQcCompReportRowDto> reportRows = dimQcCompReportRowRepository.findByReportId(reportId);
+        DimQcReport report = dimQcReportRepository.findById(reportId).get();
+
         // Get All report data
         List<QcCompReportOutputDto> reportData = qcRepository.findByReportId(reportId);
-        DimQcReport report = dimQcReportRepository.findById(reportId).get();
         Map<Integer, DimTimeSeries> yearsByIdMap = getReportingYears(report.getReportingYear());
 
-        // Map report emissions data to each row
+        // check if the report data has any data by state
+        boolean hasNonNullStateCode = reportData.stream()
+                .anyMatch(data -> data.getStateCode() != null);
+        if (hasNonNullStateCode) {
+            // Group data in reportRows by state
+            List<DimState> states = dimStateReporsitory.findByOrderByStateCodeAsc();
+            // for each state get reportRows filtered by that state's code and process them
+            // using the getReportRows method
+            List<DimQcCompReportByStateDto> stateReports = new ArrayList<>();
+            for (DimState state : states) {
+                List<DimQcCompReportRowDto> reportRowsState = new ArrayList<>();
+                for (DimQcCompReportRowDto row : reportRows) {
+                    reportRowsState.add(new DimQcCompReportRowDto(row));
+                }
+                List<QcCompReportOutputDto> stateRows = reportData.stream()
+                        .filter(data -> state.getStateCode().equals(data.getStateCode()))
+                        .collect(Collectors.toList());
+                stateReports.add(new DimQcCompReportByStateDto(state.getStateCode(),
+                        getReportRows(reportRowsState, stateRows, yearsByIdMap)));
+            }
+            return stateReports;
+        } else {
+            // Process data normally for non-state level reports
+            return Collections.singletonList(
+                    new DimQcCompReportByStateDto("ALL", getReportRows(reportRows, reportData, yearsByIdMap)));
+        }
+
+    }
+
+    public List<DimQcCompReportRowDto> getReportRows(List<DimQcCompReportRowDto> reportRows,
+            List<QcCompReportOutputDto> reportData, Map<Integer, DimTimeSeries> yearsByIdMap) {
+
+        // Iterate through each report row
         Map<Long, Map<Integer, QcCompReportOutputDto>> reportDataByRow = new HashMap<Long, Map<Integer, QcCompReportOutputDto>>();
         for (QcCompReportOutputDto dataEntry : reportData) {
             if (reportDataByRow.get(dataEntry.getReportRowId()) == null) {
@@ -80,7 +176,6 @@ public class QcReportService {
                 }
             }
         }
-
         for (DimQcCompReportRowDto reportRow : reportRows) {
             for (DimTimeSeries year : yearsByIdMap.values()) {
                 Float emissionValue = 0F;
@@ -102,7 +197,14 @@ public class QcReportService {
     public String generateQcReportCsv(Long reportId) {
         DimQcReport report = dimQcReportRepository.findById(reportId).get();
         String rowHeader = report.getReportRowsHeader();
-        List<DimQcCompReportRowDto> reportRows = getQcReportData(reportId);
+        // to let existing reports run without issue filter for 'ALL' and return report
+        // rows
+        List<DimQcCompReportRowDto> reportRows = getQcReportData(reportId).stream()
+                .filter(data -> data.getStateCode().equals("ALL"))
+                .flatMap((data -> data.getReportRows().stream())).collect(Collectors.toList());
+        if (reportRows.isEmpty()) {
+            return ""; // empty string
+        }
         Map<Integer, DimTimeSeries> yearsByIdMap = getReportingYears(report.getReportingYear());
         List<DimTimeSeries> reportingYears = dimTimeSeriesReporsitory.findAll();
         Collections.sort(reportingYears, (p1, p2) -> {
@@ -144,7 +246,12 @@ public class QcReportService {
     public String generateQcReportJson(Long reportId) {
         DimQcReport report = dimQcReportRepository.findById(reportId).get();
         String rowHeader = report.getReportRowsHeader();
-        List<DimQcCompReportRowDto> reportRows = getQcReportData(reportId);
+        List<DimQcCompReportRowDto> reportRows = getQcReportData(reportId).stream()
+                .filter(data -> data.getStateCode().equals("ALL"))
+                .flatMap((data -> data.getReportRows().stream())).collect(Collectors.toList());
+        if (reportRows.isEmpty()) {
+            return ""; // empty string
+        }
         List<DimTimeSeries> reportingYears = dimTimeSeriesReporsitory.findAll();
         Map<Integer, DimTimeSeries> yearsByIdMap = getReportingYears(report.getReportingYear());
 
@@ -188,37 +295,30 @@ public class QcReportService {
         return yearsByIdMap;
     }
 
-    public DimQcReport refreshQcReport(Long reportId, int userId) {
-        String success = "fail";
+    public DimQcReport refreshQcReport(Long reportId, int userId) throws Exception {
         String response;
         Optional<DimQcReport> option = dimQcReportRepository.findById(reportId);
         DimQcReport report = option.isPresent() ? option.get() : null;
         if (report != null) {
-            try {
-                updateReportRefreshStatus(report, ReportStatus.PROCESSING_QUERIES, userId);
-                // Call python procedure to generate the report
-                // TO-DO: externalize strings
-                String uriWithParams = String.format(pythonEndpointUrl, reportId, reportType, userId);
-                log.debug("Generate Online Reports URL: " + uriWithParams);
-                response = restService.invokeRestClient(uriWithParams).getBody();
+            updateReportRefreshStatus(report, ReportStatus.PROCESSING_QUERIES, userId);
+            // Call python procedure to generate the report
+            // TO-DO: externalize strings
+            String uriWithParams = String.format(pythonEndpointUrl, reportId, reportType, userId);
+            log.debug("Generate Online Reports URL: " + uriWithParams);
+            response = restService.invokeRestClient(uriWithParams).getBody();
 
-                updateReportRefreshStatus(report, ReportStatus.PROCESSING_DATA, userId);
+            updateReportRefreshStatus(report, ReportStatus.PROCESSING_DATA, userId);
+            try {
                 String responseParsed = jsonUtil.parseQcQueryEngineResponse(response, reportId); // includes basic
                                                                                                  // response validation
                                                                                                  // check, may throw
                                                                                                  // IOException
-
-                success = qcRepository.populateQcQueryResponse(responseParsed, userId);
-
-                if (StringUtils.equalsIgnoreCase(success, "success")) {
-                    updateReportRefreshStatus(report, ReportStatus.READY, userId);
-                } else {
-                    log.error("Error updating data for report: " + report.getReportName());
-                    updateReportRefreshStatus(report, ReportStatus.ERROR, userId);
-                }
+                qcRepository.populateQcQueryResponse(responseParsed, userId);
+                updateReportRefreshStatus(report, ReportStatus.READY, userId);
             } catch (Exception e) {
                 log.warn("Exception caught trying to refresh online report: ", e);
                 updateReportRefreshStatus(report, ReportStatus.ERROR, userId);
+                throw e;
             }
         }
         return report;

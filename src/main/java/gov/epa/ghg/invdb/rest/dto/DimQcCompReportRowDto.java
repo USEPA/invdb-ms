@@ -75,4 +75,16 @@ public class DimQcCompReportRowDto {
         this.qcQueryFormula = qcQueryFormula;
         this.qcQueryFormulaParameters = qcQueryFormulaParameters;
     }
+
+    public DimQcCompReportRowDto(DimQcCompReportRowDto other) {
+        this.reportId = other.reportId;
+        this.reportRowId = other.reportRowId;
+        this.rowOrder = other.rowOrder;
+        this.rowGroup = other.rowGroup;
+        this.rowSubgroup = other.rowSubgroup;
+        this.rowTitle = other.rowTitle;
+        this.totalsFlag = other.totalsFlag;
+        this.excludeFlag = other.excludeFlag;
+        this.emissionsMap = new HashMap<>(other.emissionsMap);
+    }
 }

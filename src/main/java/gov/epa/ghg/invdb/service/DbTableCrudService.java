@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
-import gov.epa.ghg.invdb.repository.BaseRepository;
+import gov.epa.ghg.invdb.repository.BaseDimTableRepository;
 import gov.epa.ghg.invdb.repository.DimCategoryRepository;
 import gov.epa.ghg.invdb.repository.DimFuelTypeRepository;
 import gov.epa.ghg.invdb.repository.DimGhgCategoryRepository;
@@ -25,6 +25,7 @@ import gov.epa.ghg.invdb.rest.dto.DimSubsectorDto;
 import gov.epa.ghg.invdb.util.EntityFactory;
 import gov.epa.ghg.invdb.util.RepositoryFactory;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.transaction.Transactional;
 import lombok.extern.log4j.Log4j2;
 
 // Implement CRUD operations for database tables
@@ -53,40 +54,46 @@ public class DbTableCrudService {
     private EntityFactory entityFactory;
 
     public List<?> getRecords(String tablename, HttpServletResponse response) {
+
         List<?> results = null;
         switch (tablename) {
             case "DIM_SECTOR":
-                results = dimSectorRepository.findByOrderBySectorNameAsc().stream()
+                results = dimSectorRepository.findAllOrderedBySectorName().stream()
                         .map(sector -> new DimSectorDto(sector.getSectorId(), sector.getSectorCode(),
                                 sector.getSectorName()))
                         .collect(Collectors.toList());
                 break;
             case "DIM_SUBSECTOR":
-                results = dimSubsectorRepository.findByOrderBySubsectorNameAsc().stream()
+                results = dimSubsectorRepository.findAllOrderedBySubsectorName().stream()
                         .map(subsector -> new DimSubsectorDto(subsector.getSubsectorId(), subsector.getSubsectorCode(),
                                 subsector.getSubsectorName(), subsector.getSectorId()))
                         .collect(Collectors.toList());
                 break;
             case "DIM_CATEGORY":
-                results = dimCategoryRepository.findByOrderByCategoryNameAsc().stream()
+            	  //INVDB-697 - find old and new sub-sectors, not only latest.
+//                results = dimCategoryRepository.findAllOrderedByCategoryName().stream()
+//                        .map(cat -> new DimCategoryDto(cat.getCategoryId(), cat.getCategoryCode(),
+//                                cat.getCategoryName(), cat.getSubsectorId(), cat.getCategoryActive()))
+//                        .collect(Collectors.toList());
+                results = dimCategoryRepository.findAllCategoriesAndTheirSubsectors().stream()
                         .map(cat -> new DimCategoryDto(cat.getCategoryId(), cat.getCategoryCode(),
-                                cat.getCategoryName(), cat.getSubsectorId()))
+                                cat.getCategoryName(), cat.getSubsectorId(), cat.getCategoryActive(),cat.getSubsector().getSubsectorName()))
                         .collect(Collectors.toList());
                 break;
             case "DIM_FUEL_TYPE":
-                results = dimFuelTypeRepository.findByOrderByFuelTypeNameAsc().stream()
+                results = dimFuelTypeRepository.findAllOrderedByFuelTypeName().stream()
                         .map(ft -> new DimFuelTypeDto(ft.getFuelTypeId(), ft.getFuelTypeCode(),
                                 ft.getFuelTypeName()))
                         .collect(Collectors.toList());
                 break;
             case "DIM_GHG_CATEGORY":
-                results = dimGhgCategoryRepository.findByOrderByGhgCategoryNameAsc().stream()
+                results = dimGhgCategoryRepository.findAllOrderedByCategoryName().stream()
                         .map(ghgcat -> new DimGhgCategoryDto(ghgcat.getGhgCategoryId(), ghgcat.getGhgCategoryCode(),
                                 ghgcat.getGhgCategoryName()))
                         .collect(Collectors.toList());
                 break;
             case "DIM_GHG":
-                results = dimGhgRepository.findByOrderByGhgLongnameAsc().stream()
+                results = dimGhgRepository.findAllOrderedByDimGhgLongname().stream()
                         .map(ghg -> new DimGhgDto(ghg.getId(), ghg.getGhgCode(),
                                 ghg.getGhgLongname(), ghg.getGhgCategoryId(), ghg.getAr4Gwp(), ghg.getAr5Gwp(),
                                 ghg.getAr5fGwp(), ghg.getAr6Gwp(), ghg.getGhgFormula(), ghg.getGhgrpGhgId(),
@@ -99,12 +106,21 @@ public class DbTableCrudService {
         }
         return results;
     }
-
-    public <T, ID extends Serializable> boolean saveRecord(Map<String, Object> recordMap, String tablename) {
+    
+    @Transactional
+    public <T, ID extends Serializable> boolean saveRecord(Map<String, Object> recordMap,
+            Map<String, Object> oldRecordMap, String tablename, Integer userId) {
         try {
-            BaseRepository<T, ID> repository = repositoryFactory.getRepository(tablename);
+            BaseDimTableRepository<T, ID> repository = repositoryFactory.getRepository(tablename);
             T entity = entityFactory.getEntity(tablename, recordMap);
             repository.save(entity);
+            // call db function to handle name changes
+            String newValue = entityFactory.getUniqueFieldValue(tablename, recordMap);
+            String currentValue = entityFactory.getUniqueFieldValue(tablename,
+                    oldRecordMap);
+            if (!newValue.equals(currentValue)) {
+                repository.handleDimfieldValueChange(currentValue, newValue, userId);
+            }
             return true;
         } catch (DataIntegrityViolationException e) {
             // Handle data integrity violation (e.g., unique constraint violation)
@@ -119,10 +135,11 @@ public class DbTableCrudService {
 
     public <T, ID extends Serializable> boolean deleteRecord(Map<String, Object> recordMap, String tablename) {
         try {
-            BaseRepository<T, ID> repository = repositoryFactory.getRepository(tablename);
-            T entity = entityFactory.getEntity(tablename, recordMap);
-            repository.delete(entity);
-            return true;
+	            BaseDimTableRepository<T, ID> repository = repositoryFactory.getRepository(tablename);
+	            T entity = entityFactory.getEntity(tablename, recordMap);
+	            repository.delete(entity);
+	            return true;
+        	
         } catch (DataIntegrityViolationException e) {
             log.error("Unable to delete record due to foreign key constraints.");
             throw new RuntimeException(

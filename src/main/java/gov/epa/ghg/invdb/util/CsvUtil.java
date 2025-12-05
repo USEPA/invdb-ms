@@ -30,7 +30,11 @@ public class CsvUtil {
             List<String> rowData = fields.stream()
                     .map(field -> {
                         Object value = row.get(field);
-                        return value != null ? value.toString() : "";
+                        String sValue = value != null ? value.toString() : "";
+                        if (sValue.contains(",")) {
+                            sValue = "\"" + sValue + "\"";
+                        }
+                        return sValue;
                     })
                     .toList();
             csvBuilder.append(String.join(",", rowData)).append("\n");

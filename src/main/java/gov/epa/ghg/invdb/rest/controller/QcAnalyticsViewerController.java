@@ -8,10 +8,12 @@ import java.util.Objects;
 
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -130,15 +132,16 @@ public class QcAnalyticsViewerController {
     }
 
     @GetMapping("/downloadExcel")
-    public void downloadExcel(@RequestParam(value = "folderName", required = true) String folderName,
-            @RequestParam(name = "user") int userId,
-            HttpServletResponse response) throws Exception {
+    public ResponseEntity<StreamingResponseBody> downloadExcel(
+            @RequestParam(value = "folderName", required = true) String folderName,
+            @RequestParam(name = "user") int userId) throws Exception {
         // call python service for excel download
         String uriWithParams = String.format(
                 "/qc_analytics/download-recalculations-excel?qca_object_handle=%s&user_id=%s",
                 "analytics/qc/" + folderName,
                 userId);
         log.debug("Qc Analytics download excel: ", uriWithParams);
-        restService.invokeRestClientExcelDownload(uriWithParams, "qc_analytics_" + folderName, response);
+        return restService.invokeRestClientExcelDownload(uriWithParams, "qc_analytics_" +
+                folderName);
     }
 }

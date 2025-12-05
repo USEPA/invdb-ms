@@ -127,53 +127,72 @@ public class JsonUtil {
     }
 
     public String parseQcQueryEngineResponse(String response, Long reportId) throws IOException {
-        StringBuilder responseParsed = new StringBuilder();
+        ArrayNode flatRows = mapper.createArrayNode();
         JsonNode jsonData = (JsonNode) mapper.readTree(response.getBytes());
         if (jsonData.get("report_id") != null && reportId.equals(jsonData.get("report_id").longValue())) {
-            Iterator<JsonNode> rows = jsonData.get("query_results").elements();
-            if (rows.hasNext()) {
-                responseParsed.append("[");
-                while (rows.hasNext()) {
-                    JsonNode data = rows.next();
-                    if (data.has("emissions")) {
-                        Iterator<Map.Entry<String, JsonNode>> emissions = data.get("emissions").fields();
-                        while (emissions.hasNext()) {
-                            Map.Entry<String, JsonNode> emission = emissions.next();
-                            Float qcValue;
-                            Float emValue;
-                            if (emission.getValue() == null) {
-                                emValue = 0F;
-                            } else {
-                                emValue = emission.getValue().floatValue();
-                            }
-                            if (data.has("QC")) {
-                                qcValue = Math.abs(emValue - data.get("QC").get(emission.getKey()).floatValue());
-                            } else {
-                                log.warn("Missing QC data for row = " + data.get("report_row_id")
-                                        + ", emission value will be used");
-                                qcValue = Math.abs(emValue);
-                            }
-
-                            responseParsed.append("{");
-                            responseParsed.append("\"qc_report_row_id\": " + data.get("report_row_id") + ", ");
-                            responseParsed.append("\"year_id\": " + emission.getKey() + ", ");
-                            responseParsed.append("\"qc_emission_value\": " + qcValue.toString());
-                            responseParsed.append(" }, ");
+            JsonNode queryResults = jsonData.get("query_results");
+            if (queryResults != null && queryResults.fieldNames().hasNext()) {
+                Iterator<Map.Entry<String, JsonNode>> stateEntries = queryResults.fields();
+                // Flatten all state rows into a single ArrayNode
+                while (stateEntries.hasNext()) {
+                    Map.Entry<String, JsonNode> entry = stateEntries.next();
+                    String stateCode = entry.getKey();
+                    JsonNode rows = entry.getValue();
+                    for (JsonNode row : rows) {
+                        if (row instanceof ObjectNode) {
+                            ((ObjectNode) row).put("state_code", stateCode);
                         }
-                    } else {
-                        log.warn("Missing emissions data for row = " + data.get("report_row_id") + ", skipping row.");
+                        flatRows.add(row);
                     }
                 }
-                responseParsed.deleteCharAt(responseParsed.lastIndexOf(","));// truncate the last comma from the string
-                responseParsed.append("]");
-            } else {
-                throw new IOException("unrecognized response: " + response);
             }
         } else {
             throw new IOException("Wrong reportID in response: " + jsonData.get("report_id").longValue()
                     + "; expected: " + reportId.toString());
         }
 
+        StringBuilder responseParsed = new StringBuilder();
+        Iterator<JsonNode> rows = flatRows.elements();
+        if (rows.hasNext()) {
+            responseParsed.append("[");
+            while (rows.hasNext()) {
+                JsonNode data = rows.next();
+                if (data.has("emissions")) {
+                    Iterator<Map.Entry<String, JsonNode>> emissions = data.get("emissions").fields();
+                    while (emissions.hasNext()) {
+                        Map.Entry<String, JsonNode> emission = emissions.next();
+                        Float qcValue;
+                        Float emValue;
+                        if (emission.getValue() == null) {
+                            emValue = 0F;
+                        } else {
+                            emValue = emission.getValue().floatValue();
+                        }
+                        if (data.has("QC")) {
+                            qcValue = Math.abs(emValue - data.get("QC").get(emission.getKey()).floatValue());
+                        } else {
+                            log.warn("Missing QC data for row = " + data.get("report_row_id")
+                                    + ", emission value will be used");
+                            qcValue = Math.abs(emValue);
+                        }
+
+                        responseParsed.append("{");
+                        responseParsed.append("\"qc_report_row_id\": " + data.get("report_row_id") + ", ");
+                        responseParsed.append("\"year_id\": " + emission.getKey() + ", ");
+                        responseParsed.append("\"qc_emission_value\": " + qcValue.toString() + ", ");
+                        responseParsed.append("\"state_code\": " + data.get("state_code"));
+                        responseParsed.append(" }, ");
+                    }
+                } else {
+                    log.warn("Missing emissions data for row = " + data.get("report_row_id") + ", skipping row.");
+                }
+            }
+
+            responseParsed.deleteCharAt(responseParsed.lastIndexOf(","));// truncate the last comma from the string
+            responseParsed.append("]");
+        } else {
+            throw new IOException("unrecognized response: " + response);
+        }
         return responseParsed.toString();
     }
 

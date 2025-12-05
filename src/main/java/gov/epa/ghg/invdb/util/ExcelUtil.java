@@ -2,6 +2,7 @@ package gov.epa.ghg.invdb.util;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -10,24 +11,37 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
+import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.CellValue;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.eventusermodel.ReadOnlySharedStringsTable;
+import org.apache.poi.xssf.eventusermodel.XSSFReader;
+import org.apache.poi.xssf.eventusermodel.XSSFSheetXMLHandler;
+import org.apache.poi.xssf.model.StylesTable;
+import org.apache.poi.xssf.usermodel.XSSFComment;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
+import org.xml.sax.InputSource;
+import org.xml.sax.XMLReader;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import gov.epa.ghg.invdb.exception.ExcelReadException;
 import lombok.extern.log4j.Log4j2;
 
 @Component
@@ -83,7 +97,7 @@ public class ExcelUtil {
         }
     }
 
-    public Optional<String> readCell(MultipartFile file, String sheetName, int rowIndex, int columnIndex)
+    public Optional<String> readCellWithFormula(MultipartFile file, String sheetName, int rowIndex, int columnIndex)
             throws IOException {
         try (InputStream inputStream = file.getInputStream();
                 Workbook workbook = new XSSFWorkbook(inputStream)) {
@@ -99,6 +113,70 @@ public class ExcelUtil {
             String cellValue = getCellValue(cell, evaluator);
             return Optional.ofNullable(cellValue != null ? cellValue : null);
         }
+    }
+
+    public Map<String, String> readSpecificCells(MultipartFile file, String sheetName, Set<String> targetCells) {
+        File tempFile = null;
+        try {
+            tempFile = File.createTempFile("upload-" + file.getOriginalFilename(), ".xlsx");
+            file.transferTo(tempFile);
+            try (OPCPackage pkg = OPCPackage.open(tempFile)) {
+                XSSFReader reader = new XSSFReader(pkg);
+
+                ReadOnlySharedStringsTable strings = new ReadOnlySharedStringsTable(pkg);
+                StylesTable styles = reader.getStylesTable();
+                XSSFReader.SheetIterator iter = (XSSFReader.SheetIterator) reader.getSheetsData();
+                while (iter.hasNext()) {
+                    try (InputStream sheetStream = iter.next()) {
+                        if (iter.getSheetName().equalsIgnoreCase(sheetName)) {
+                            return parseSheet(sheetStream, styles, strings, targetCells);
+                        }
+                    }
+                }
+                throw new ExcelReadException(
+                        "Expected worksheet \"" + sheetName + "\" was not found in the uploaded workbook."
+                                + "  Please confirm you are uploading the correct Reporting Form.");
+
+            }
+        } catch (Exception e) {
+            throw new ExcelReadException("Error reading Excel file", e);
+        } finally {
+            // Clean up temporary file
+            if (tempFile != null && tempFile.exists())
+                tempFile.delete();
+        }
+    }
+
+    private Map<String, String> parseSheet(InputStream inputStream, StylesTable styles,
+            ReadOnlySharedStringsTable strings, Set<String> targetCells) throws Exception {
+        Map<String, String> cellValues = new HashMap<>();
+        Set<String> lcTargetCells = targetCells.stream().map(String::toUpperCase).collect(Collectors.toSet());
+        DataFormatter formatter = new DataFormatter();
+        XMLReader parser = XmlUtil.createSecureXMLReader();
+        parser.setContentHandler(new XSSFSheetXMLHandler(
+                styles,
+                null,
+                strings,
+                new XSSFSheetXMLHandler.SheetContentsHandler() {
+                    @Override
+                    public void startRow(int rowNum) {
+                    }
+
+                    @Override
+                    public void endRow(int rowNum) {
+                    }
+
+                    @Override
+                    public void cell(String cellRef, String formattedValue, XSSFComment comment) {
+                        if (lcTargetCells.contains(cellRef)) {
+                            cellValues.put(cellRef, formattedValue != null ? formattedValue.trim() : "");
+                        }
+                    }
+                },
+                formatter,
+                false));
+        parser.parse(new InputSource(inputStream));
+        return cellValues;
     }
 
     public Map<String, String> convertToJson(MultipartFile file, String sheetName) throws IOException {

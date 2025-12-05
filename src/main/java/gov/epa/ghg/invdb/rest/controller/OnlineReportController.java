@@ -8,12 +8,14 @@ import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import gov.epa.ghg.invdb.enumeration.AttachmentType;
 import gov.epa.ghg.invdb.model.DimReport;
@@ -121,16 +123,17 @@ public class OnlineReportController {
 
     @SuppressWarnings("unchecked")
     @PostMapping("/downloadRpt")
-    public void downloadRpt(
+    public ResponseEntity<StreamingResponseBody> downloadRpt(
             @RequestBody Map<String, Object> requestBody,
             @RequestParam(name = "format") String format,
-            @RequestParam(name = "user") int userId,
-            HttpServletResponse response)
-            throws IOException, Exception {
+            @RequestParam(name = "user") int userId)
+            throws Exception {
         List<Map<String, Object>> headers = (List<Map<String, Object>>) requestBody.get("headers");
         List<Map<String, Object>> data = (List<Map<String, Object>>) requestBody.get("data");
-        byte[] reportData = reportService.generateEmissionsReportForDownload(headers, data, format);
-        attachmentHelper.createFileDownloadResponse(response, reportData, "abc", format);
+        byte[] reportData = reportService.generateEmissionsReportForDownload(headers,
+                data, format);
+        return attachmentHelper.createFileDownloadResponse(reportData, "abc",
+                format);
     }
 
     @GetMapping("/getReportRowsMetadata")

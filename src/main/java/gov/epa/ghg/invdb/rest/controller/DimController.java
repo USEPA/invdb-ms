@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,6 +24,7 @@ import gov.epa.ghg.invdb.repository.DimPublicationYearRepository;
 import gov.epa.ghg.invdb.repository.DimReportRepository;
 import gov.epa.ghg.invdb.repository.DimReportRowRepository;
 import gov.epa.ghg.invdb.repository.DimSourceNameRepository;
+import gov.epa.ghg.invdb.repository.DimSourceNameRepository.PubDimSourceCheck;
 import gov.epa.ghg.invdb.repository.DimTimeSeriesRepository;
 import gov.epa.ghg.invdb.rest.dto.ArchiveEventDto;
 import gov.epa.ghg.invdb.rest.dto.DimExcelReportDto;
@@ -92,9 +94,22 @@ public class DimController {
             @RequestParam(name = "subsector") String subsector,
             @RequestParam(name = "category") String category,
             @RequestParam(name = "subcategory1") String subcategory1) {
-        List<DimSourceNameDto> sourceNames = dimSourceNameRepository.checkTemplate3DimSourceName(sector, subsector,
-                category, subcategory1, layerId, rptYear);
+        //List<DimSourceNameDto> sourceNames = dimSourceNameRepository.checkTemplate3DimSourceName(sector, subsector,
+                //category, subcategory1, layerId, rptYear);
+        List<DimSourceNameDto> sourceNames = dimSourceNameRepository.checkTemplate3DimSourceName(category, subcategory1, layerId, rptYear);
         return sourceNames.size() > 0;
+    }
+    
+    //INVDB-687
+    @GetMapping("/checkTemplate3SourceName/{layerId}/{rptYear}/{category}/{subcategory1}")
+    public PubDimSourceCheck checkTemplate3SourceName(
+    		@PathVariable int layerId,
+    		@PathVariable int rptYear,
+    		@PathVariable String category,
+    		@PathVariable String subcategory1) {
+    	//String tempOutput = String.format("the parameters are: layerId:%s, rptYear:%s, category:%s, subcategory1:%s" , layerId, rptYear, category, subcategory1 );
+        //System.out.println(tempOutput);
+        return dimSourceNameRepository.checkDimSourceName(category, subcategory1, layerId, rptYear);
     }
 
     @GetMapping("/archiveEventTypes")

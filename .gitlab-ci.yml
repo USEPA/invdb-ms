@@ -9,7 +9,7 @@ cache:
     - .gradle/wrapper
     - .gradle/caches
 compile-test:
-  image: 015137877991.dkr.ecr.us-east-1.amazonaws.com/gradle:8.6-jdk21-jammy-saic-root
+  image: public.ecr.aws/m4h5k9r6/gradle:8.6-jdk21-jammy-saic-root
   stage: compile-test
   script:
     - ./gradlew test
@@ -17,10 +17,13 @@ compile-test:
     variables:
       - $GITLAB_SITE == 'SAIC'
 build-image-saic:
-  image: 015137877991.dkr.ecr.us-east-1.amazonaws.com/paketobuildpacks/builder-jammy-base-saic-root
+  when: on_success
+  stage: build-image-saic
+  only:
+    - master
+  image: public.ecr.aws/m4h5k9r6/paketobuildpacks/builder-jammy-base-saic-root
   variables:
     CNB_PLATFORM_API: "0.12"
-  stage: build-image-saic
   script:
     - mkdir -p platform/env
     - mkdir -p platform/bindings/ca-certificates
@@ -33,6 +36,3 @@ build-image-saic:
     - mkdir ~/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > ~/.docker/config.json
     - /cnb/lifecycle/creator -app=. -platform platform $CI_REGISTRY_IMAGE/invdb-ms:$CI_COMMIT_SHORT_SHA
-  only:
-    variables:
-      - $GITLAB_SITE == 'SAIC'

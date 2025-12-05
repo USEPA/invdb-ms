@@ -2,6 +2,8 @@ package gov.epa.ghg.invdb.service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -61,7 +63,9 @@ public class SourceFileService {
             String sourceName = "";
 
             if (template == 2) {
-                sourceName = excelUtil.readCell(file, "InvDB", 8, 3).orElse(""); // c8
+                Map<String, String> cellValues = excelUtil.readSpecificCells(file, "InvDB",
+                        Set.of("C8"));
+                sourceName = cellValues.getOrDefault("C8", "");
             }
 
             int sourceNameId = -1;
@@ -96,23 +100,29 @@ public class SourceFileService {
                     }
                 } else {
                     // expect excel
-                    sector = excelUtil.readCell(file, "InvDB", 2, 2).orElse("").trim(); // b2
-                    subsector = excelUtil.readCell(file, "InvDB", 2, 3).orElse("").trim(); // c2
-                    category = excelUtil.readCell(file, "InvDB", 2, 4).orElse("").trim(); // d2
-                    subcategory1 = excelUtil.readCell(file, "InvDB", 2, 5).orElse("").trim(); // e2
+                    Map<String, String> cellValues = excelUtil.readSpecificCells(file, "InvDB",
+                            Set.of("B2", "C2", "D2", "E2"));
+                    sector = cellValues.getOrDefault("B2", ""); // b2
+                    subsector = cellValues.getOrDefault("C2", "");// c2checkTemplate3DimSourceName
+                    category = cellValues.getOrDefault("D2", "");// d2
+                    subcategory1 = cellValues.getOrDefault("E2", "");// e2
                 }
 
-                List<DimSourceNameDto> possibleSourceNames = dimSourceNameRepository.checkTemplate3DimSourceName(sector,
-                        subsector, category, subcategory1, layerId, reportingYr);
+//                List<DimSourceNameDto> possibleSourceNames = dimSourceNameRepository.checkTemplate3DimSourceName(sector,
+//                        subsector, category, subcategory1, layerId, reportingYr);
+                
+                List<DimSourceNameDto> possibleSourceNames = dimSourceNameRepository.checkTemplate3DimSourceName(category, subcategory1, layerId, reportingYr);
                 if (possibleSourceNames.size() > 0) {
                     sourceNameId = possibleSourceNames.get(0).getId();
                     sourceName = possibleSourceNames.get(0).getName();
                 }
             }
+            System.out.println("db gave the source name" + sourceName);
             // Check if there is already an existing file for this source
             String finalSourceName = sourceName;
+            
             DimSourceNameDto sourceNameObj = sourceNames.stream()
-                    .filter(s -> s.getName().equalsIgnoreCase(finalSourceName) && s.getPubYearId() == pubYear.getId())
+                    .filter(s -> s.getName().trim().equalsIgnoreCase(finalSourceName.trim()) && s.getPubYearId() == pubYear.getId())
                     .findFirst().orElse(null);
             if (sourceNameObj == null) {
                 throw new Exception("Unable to find a source name for template " + template + " file: " + fileName);

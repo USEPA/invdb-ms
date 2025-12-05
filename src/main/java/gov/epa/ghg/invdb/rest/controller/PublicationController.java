@@ -1,6 +1,5 @@
 package gov.epa.ghg.invdb.rest.controller;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -14,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import gov.epa.ghg.invdb.exception.BadRequestException;
 import gov.epa.ghg.invdb.model.PublicationVersion;
 import gov.epa.ghg.invdb.repository.PublicationObjectRepository;
 import gov.epa.ghg.invdb.repository.PublicationVersionRepository;
@@ -23,7 +24,6 @@ import gov.epa.ghg.invdb.rest.dto.PublicationObjectDto;
 import gov.epa.ghg.invdb.rest.helper.AttachmentHelper;
 import gov.epa.ghg.invdb.service.PublicationService;
 import gov.epa.ghg.invdb.service.RestService;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.log4j.Log4j2;
 
 @RestController
@@ -117,14 +117,12 @@ public class PublicationController {
         }
 
         @GetMapping("/download")
-        public void downloadAttachments(
+        public ResponseEntity<StreamingResponseBody> downloadAttachments(
                         @RequestParam(name = "pubObjIds") List<Long> pubObjIds,
                         @RequestParam(name = "format") String format,
-                        @RequestParam(name = "user") int userId,
-                        HttpServletResponse response)
-                        throws IOException {
-                if (pubObjIds == null) {
-                        throw new IOException("pubObjIds list is empty");
+                        @RequestParam(name = "user") int userId) {
+                if (pubObjIds == null || pubObjIds.size() <= 0) {
+                        throw new BadRequestException("pubObjIds list is empty");
                 }
                 if (format.equalsIgnoreCase("json")) {
                         List<PublicationObjectDto> pubObjDtos = pubObjectRepository.getRefinedDataObjects(pubObjIds);
@@ -134,9 +132,8 @@ public class PublicationController {
                                                 new AttachmentDto(pubObjDto.getRefinedTablename(),
                                                                 pubObjDto.getRefinedData()));
                         }
-                        // if (format.equalsIgnoreCase("json")) {
-                        attachmentHelper// .downloadJsonZip
-                                        .downloadZip(response, "publicationFiles", attachementDtos);
+                        return attachmentHelper
+                                        .downloadZip("publicationFiles", attachementDtos);
                 } else if (format.equalsIgnoreCase("excel")) {
                         String uriWithParams = String.format(
                                         "/publication-download?pub_object_id=%s&user_id=%s",
@@ -145,8 +142,9 @@ public class PublicationController {
                                                         .collect(Collectors.joining(",")),
                                         userId);
                         log.debug("Publication Prepare URL: ", uriWithParams);
-                        restService.invokeRestClientZipDownload(uriWithParams, "publicationFiles", response);
+                        return restService.invokeRestClientZipDownload(uriWithParams, "publicationFiles");
                 }
+                throw new BadRequestException("Invalid format specified");
         }
 
         @GetMapping("/refinedTables")
